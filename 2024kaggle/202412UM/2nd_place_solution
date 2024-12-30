@@ -1,0 +1,1509 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "1e5b6df1",
+   "metadata": {
+    "papermill": {
+     "duration": 0.007773,
+     "end_time": "2024-12-30T02:36:20.035731",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:20.027958",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "# Submission notebook for 2nd place solution in [UM - Game-Playing Strength of MCTS Variants](https://www.kaggle.com/competitions/um-game-playing-strength-of-mcts-variants)\n",
+    "\n",
+    "Link to description: [2nd place solution](https://www.kaggle.com/competitions/um-game-playing-strength-of-mcts-variants/discussion/549718)\n",
+    "\n",
+    "Link to model dataset, with instructions on how to reproduce the model binaries for the 2nd place solution (offline training): [um-gpsomctsv-2nd-place-solution](https://www.kaggle.com/datasets/fredrikupmark/um-gpsomctsv-2nd-place-solution)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "3bd965e0",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006642,
+     "end_time": "2024-12-30T02:36:20.049520",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:20.042878",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "The variable \"original_CV_optimized_prop\" below selects the desired blend between the two final submissions.\n",
+    "\n",
+    "A value of 0 reproduces the predictions of the 2nd place winning, more Public Leaderboard aligned, submission.\n",
+    "This submission scored 0.41996 on the private test set and reached nr 2 on the private leaderboard.\n",
+    "\n",
+    "A value of 1 reproduces the predictions of the second selected, more conservative, Cross Validation (CV) optimized submission.\n",
+    "This scored 0.42324 on the private test set. That is, this submission would have reached nr 6 on the Private Leaderboard (probably with Public Leaderboard aligned submissions ahead of it). Since this second submission was optimized to the larger CV data-set, it is possible (but definitely not certain) that blending values closer to 1 could generate predictions that generalize better outside the competition data.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "e23822e2",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:20.065863Z",
+     "iopub.status.busy": "2024-12-30T02:36:20.064657Z",
+     "iopub.status.idle": "2024-12-30T02:36:20.073931Z",
+     "shell.execute_reply": "2024-12-30T02:36:20.073014Z"
+    },
+    "papermill": {
+     "duration": 0.019812,
+     "end_time": "2024-12-30T02:36:20.076209",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:20.056397",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "original_CV_optimized_prop = 0  #0 => fully trust LB, 1 => fully trust CV"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "db4b1296",
+   "metadata": {
+    "papermill": {
+     "duration": 0.007124,
+     "end_time": "2024-12-30T02:36:20.090667",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:20.083543",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "448cb03b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:20.106125Z",
+     "iopub.status.busy": "2024-12-30T02:36:20.105407Z",
+     "iopub.status.idle": "2024-12-30T02:36:20.109735Z",
+     "shell.execute_reply": "2024-12-30T02:36:20.108862Z"
+    },
+    "papermill": {
+     "duration": 0.014554,
+     "end_time": "2024-12-30T02:36:20.112119",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:20.097565",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "model_sets_to_use = list(range(6)) #Should be set to number of used seeds (i.e. 6 for the 2nd place solution)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "a4bd75f6",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:20.136704Z",
+     "iopub.status.busy": "2024-12-30T02:36:20.135764Z",
+     "iopub.status.idle": "2024-12-30T02:36:20.140738Z",
+     "shell.execute_reply": "2024-12-30T02:36:20.139855Z"
+    },
+    "papermill": {
+     "duration": 0.017691,
+     "end_time": "2024-12-30T02:36:20.142743",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:20.125052",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "nr_of_gpus = 1 + (len(model_sets_to_use)>4)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "e8454e58",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:20.158693Z",
+     "iopub.status.busy": "2024-12-30T02:36:20.157784Z",
+     "iopub.status.idle": "2024-12-30T02:36:20.164479Z",
+     "shell.execute_reply": "2024-12-30T02:36:20.163630Z"
+    },
+    "papermill": {
+     "duration": 0.016729,
+     "end_time": "2024-12-30T02:36:20.166437",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:20.149708",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "data_paths = {}\n",
+    "gpu_by_set = {}\n",
+    "neural_model_paths = {}\n",
+    "data_paths[0] = f'/kaggle/input/um-gpsomctsv-2nd-place-solution/UM - Game-Playing Strength of MCTS Variants - 2nd place solution/models/models_SEED_{0}/'\n",
+    "for set_nr in model_sets_to_use:\n",
+    "    data_paths[set_nr] = f'/kaggle/input/um-gpsomctsv-2nd-place-solution/UM - Game-Playing Strength of MCTS Variants - 2nd place solution/models/models_SEED_{set_nr}/'\n",
+    "    gpu_by_set[set_nr] = set_nr%nr_of_gpus\n",
+    "\n",
+    "    neural_model_paths[set_nr] = f'/kaggle/input/um-gpsomctsv-2nd-place-solution/UM - Game-Playing Strength of MCTS Variants - 2nd place solution/models/models_SEED_{set_nr}/TENSORRT_PRE_MODEL'"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "a05565bb",
+   "metadata": {
+    "_cell_guid": "b1076dfc-b9ad-4769-8c92-a6c4dae69d19",
+    "_uuid": "8f2839f25d086af736a60e9eeb907d3b93b6e0e5",
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:20.182559Z",
+     "iopub.status.busy": "2024-12-30T02:36:20.181613Z",
+     "iopub.status.idle": "2024-12-30T02:36:20.470018Z",
+     "shell.execute_reply": "2024-12-30T02:36:20.469191Z"
+    },
+    "papermill": {
+     "duration": 0.298864,
+     "end_time": "2024-12-30T02:36:20.472337",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:20.173473",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "\n",
+    "import polars as pl\n",
+    "\n",
+    "import numpy as np\n",
+    "\n",
+    "import copy\n",
+    "\n",
+    "import dill as pickle\n",
+    "\n",
+    "import re\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "c4261754",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:20.488112Z",
+     "iopub.status.busy": "2024-12-30T02:36:20.487222Z",
+     "iopub.status.idle": "2024-12-30T02:36:21.443244Z",
+     "shell.execute_reply": "2024-12-30T02:36:21.442420Z"
+    },
+    "papermill": {
+     "duration": 0.966028,
+     "end_time": "2024-12-30T02:36:21.445406",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:20.479378",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "import kaggle_evaluation.mcts_inference_server"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "a96afbce",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:21.461486Z",
+     "iopub.status.busy": "2024-12-30T02:36:21.460520Z",
+     "iopub.status.idle": "2024-12-30T02:36:23.609486Z",
+     "shell.execute_reply": "2024-12-30T02:36:23.608497Z"
+    },
+    "papermill": {
+     "duration": 2.158989,
+     "end_time": "2024-12-30T02:36:23.611719",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:21.452730",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "4.2.0\n"
+     ]
+    }
+   ],
+   "source": [
+    "import lightgbm as lgb\n",
+    "print(lgb.__version__)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "39fcae23",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:23.627342Z",
+     "iopub.status.busy": "2024-12-30T02:36:23.626848Z",
+     "iopub.status.idle": "2024-12-30T02:36:24.140562Z",
+     "shell.execute_reply": "2024-12-30T02:36:24.139489Z"
+    },
+    "papermill": {
+     "duration": 0.524211,
+     "end_time": "2024-12-30T02:36:24.143183",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:23.618972",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'1.2.5'"
+      ]
+     },
+     "execution_count": 8,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import catboost\n",
+    "from catboost import CatBoostRegressor\n",
+    "catboost.__version__"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "id": "c8668064",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:24.160498Z",
+     "iopub.status.busy": "2024-12-30T02:36:24.159682Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.643346Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.642104Z"
+    },
+    "papermill": {
+     "duration": 11.494345,
+     "end_time": "2024-12-30T02:36:35.645725",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:24.151380",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "import tensorflow as tf"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "id": "0e96ae6f",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.662392Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.661385Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.666026Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.664984Z"
+    },
+    "papermill": {
+     "duration": 0.014915,
+     "end_time": "2024-12-30T02:36:35.668017",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.653102",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "from tensorflow import saved_model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "9585d491",
+   "metadata": {
+    "papermill": {
+     "duration": 0.00694,
+     "end_time": "2024-12-30T02:36:35.682175",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.675235",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "id": "dc53dbd7",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.698633Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.697703Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.703117Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.702137Z"
+    },
+    "papermill": {
+     "duration": 0.01565,
+     "end_time": "2024-12-30T02:36:35.705088",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.689438",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def split_agent_fields(df, agent_nr):\n",
+    "    df = df.with_columns(\n",
+    "\n",
+    "        pl.col(f'agent{agent_nr}')\n",
+    "\n",
+    "        .str.splitn('-', len(agent_fields))\n",
+    "\n",
+    "        .struct.rename_fields(agent_fields)\n",
+    "\n",
+    "        .alias(\"fields\")\n",
+    "\n",
+    "    ).unnest(\"fields\")\n",
+    "    return df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "id": "c00890c3",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.721520Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.720820Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.726519Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.725543Z"
+    },
+    "papermill": {
+     "duration": 0.015972,
+     "end_time": "2024-12-30T02:36:35.728433",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.712461",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def process_agent_fields(df):\n",
+    "    for agent_nr in [1,2]:\n",
+    "        df = split_agent_fields(df, agent_nr)\n",
+    "\n",
+    "        for agent_field in agent_fields_to_init_dict:\n",
+    "            for variable_sub_name in agent_fields_to_init_dict[agent_field]:\n",
+    "                df = df.with_columns( pl.lit(df[agent_field]==variable_sub_name).alias(f'AG{agent_nr}_{agent_field}_{variable_sub_name}') )\n",
+    "\n",
+    "        df = df.drop(agent_fields)\n",
+    "        \n",
+    "    return df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "id": "0d278b5b",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.744625Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.743787Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.748231Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.747350Z"
+    },
+    "papermill": {
+     "duration": 0.014318,
+     "end_time": "2024-12-30T02:36:35.750025",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.735707",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def cap_to_target_range(preds):\n",
+    "    return np.maximum(-1, np.minimum(1, preds))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ed311640",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006791,
+     "end_time": "2024-12-30T02:36:35.763888",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.757097",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "ddf4dbef",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006814,
+     "end_time": "2024-12-30T02:36:35.777671",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.770857",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "source": [
+    "Thx to [https://www.kaggle.com/code/yunsuxiaozi/mcts-starter](https://www.kaggle.com/code/yunsuxiaozi/mcts-starter) for the idea to calculate text scores!"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "id": "f8ce0b6d",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.793244Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.792884Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.798720Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.797751Z"
+    },
+    "papermill": {
+     "duration": 0.015826,
+     "end_time": "2024-12-30T02:36:35.800558",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.784732",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def ARI_McAlpine_EFLAW_CLRI(txt):\n",
+    "    characters=len(txt)\n",
+    "    words=len(re.split(' |\\\\n|\\\\.|\\\\?|\\\\!|\\,',txt))\n",
+    "    sentence=len(re.split('\\\\.|\\\\?|\\\\!',txt))\n",
+    "    ari_score=4.71*(characters/words)+0.5*(words/sentence)-21.43\n",
+    "    mcalpine_eflaw_score=(words+sentence*words)/sentence\n",
+    "    L=100*characters/words\n",
+    "    S=100*sentence/words\n",
+    "    clri_score=0.0588*L-0.296*S-15.8\n",
+    "    return ari_score, mcalpine_eflaw_score, clri_score"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "id": "de5e0bca",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.815958Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.815625Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.820908Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.819979Z"
+    },
+    "papermill": {
+     "duration": 0.015318,
+     "end_time": "2024-12-30T02:36:35.822948",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.807630",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def clean_pd_col(pd_col):\n",
+    "    pd_col=pd_col.fillna(\"nan\")\n",
+    "    pd_col=pd_col.apply(lambda x:x.lower())\n",
+    "    ps='!\"#$%&\\'()*+,-./:;<=>?@[\\\\]^_`{|}~'\n",
+    "    for p in ps:\n",
+    "        pd_col=pd_col.apply(lambda x:x.replace(p,' '))\n",
+    "    return np.array(pd_col)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "id": "cabc6c6f",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.838516Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.838191Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.843239Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.842333Z"
+    },
+    "papermill": {
+     "duration": 0.014969,
+     "end_time": "2024-12-30T02:36:35.845189",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.830220",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def drop_gamename(rule):\n",
+    "    rule=rule[len('(game \"'):]\n",
+    "    for i in range(len(rule)):\n",
+    "        if rule[i]=='\"':\n",
+    "            return rule[i+1:]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "e9f9b759",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.861164Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.860785Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.866469Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.865560Z"
+    },
+    "papermill": {
+     "duration": 0.016013,
+     "end_time": "2024-12-30T02:36:35.868447",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.852434",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def get_player(rule):\n",
+    "    player=''\n",
+    "    stack=[]\n",
+    "    for i in range(len(rule)):\n",
+    "        player+=rule[i]\n",
+    "        if rule[i] in ['(','{']:\n",
+    "            stack.append(rule[i])\n",
+    "        elif rule[i] in [')','}']:\n",
+    "            stack=stack[:-1]\n",
+    "            if len(stack)==0:\n",
+    "                return player"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "id": "c67a7556",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.885096Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.884300Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.890458Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.889496Z"
+    },
+    "papermill": {
+     "duration": 0.016407,
+     "end_time": "2024-12-30T02:36:35.892382",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.875975",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def get_ARI_McAlpine_EFLAW_CLRI_col_scores(tmp_df, col_name, target_str_name):\n",
+    "    cols_to_add = []\n",
+    "    ARI_McAlpine_EFLAW_CLRI_values = tmp_df[col_name].to_pandas().apply(lambda x:ARI_McAlpine_EFLAW_CLRI(x))\n",
+    "    ARI_McAlpine_EFLAW_CLRI_values = np.transpose(list(ARI_McAlpine_EFLAW_CLRI_values))\n",
+    "    for iter_nr, calc_score in enumerate(['_ARI', '_McAlpine_EFLAW', '_CLRI']):\n",
+    "        tmp_col_name = target_str_name+calc_score\n",
+    "        cols_to_add.append(tmp_col_name)\n",
+    "        tmp_df = tmp_df.with_columns( pl.lit( np.array( ARI_McAlpine_EFLAW_CLRI_values[iter_nr] ) ).alias(tmp_col_name) )    \n",
+    "        \n",
+    "    return tmp_df, cols_to_add"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "59505b64",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.908273Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.907475Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.914768Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.913869Z"
+    },
+    "papermill": {
+     "duration": 0.016969,
+     "end_time": "2024-12-30T02:36:35.916513",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.899544",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def LudRules(df, group_col, new_rules_col):\n",
+    "    tmp_df = df.select(pl.col(group_col).value_counts()).unnest(group_col)\n",
+    "    tmp_df = tmp_df.with_columns( pl.lit( np.array( tmp_df[group_col].to_pandas().apply(lambda x:drop_gamename(x)) ) ).alias(new_rules_col) )\n",
+    "    tmp_df = tmp_df.with_columns( pl.lit( np.array( tmp_df[new_rules_col].to_pandas().apply(lambda rule:get_player(rule)) ) ).alias('player') )\n",
+    "    tmp_df = tmp_df.with_columns( pl.lit( np.array( [rule[len(player):] for player,rule in zip(tmp_df['player'].to_pandas(),tmp_df[new_rules_col].to_pandas())] ) ).alias(new_rules_col) )\n",
+    "\n",
+    "    tmp_df, cols_to_add = get_ARI_McAlpine_EFLAW_CLRI_col_scores(tmp_df, new_rules_col, group_col)\n",
+    "\n",
+    "    df = tmp_df[[group_col, new_rules_col]+cols_to_add].join(\n",
+    "        other = df,\n",
+    "        on = group_col,\n",
+    "        how = 'inner',\n",
+    "        validate = '1:m',\n",
+    "    )\n",
+    "    \n",
+    "    return df"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6d9c384a",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006659,
+     "end_time": "2024-12-30T02:36:35.930285",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.923626",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "id": "8c0994a4",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:35.946365Z",
+     "iopub.status.busy": "2024-12-30T02:36:35.946044Z",
+     "iopub.status.idle": "2024-12-30T02:36:35.984633Z",
+     "shell.execute_reply": "2024-12-30T02:36:35.983557Z"
+    },
+    "papermill": {
+     "duration": 0.049454,
+     "end_time": "2024-12-30T02:36:35.986695",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.937241",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "def predict(test: pl.DataFrame, sample_sub: pl.DataFrame):\n",
+    "    # Replace this function with your inference code.\n",
+    "    # You can return either a Pandas or Polars dataframe, though Polars is recommended.\n",
+    "    # Each batch of predictions (except the very first) must be returned within 10 minutes of the batch features being provided.\n",
+    "\n",
+    "    \n",
+    "    #load neural models (placed within predict function to comply with the server time limit)\n",
+    "    if len(neural_models)==0:\n",
+    "        for set_nr in model_sets_to_use:\n",
+    "            with tf.device(f'/GPU:{gpu_by_set[set_nr]}'):\n",
+    "                loaded_neural_models[set_nr] = saved_model.load(neural_model_paths[set_nr])\n",
+    "                neural_models[set_nr] = loaded_neural_models[set_nr].signatures['serving_default']\n",
+    "                \n",
+    "    \n",
+    "    group_col = 'LudRules'\n",
+    "    test = LudRules(test, group_col, 'new_rules')\n",
+    "    \n",
+    "    test = test.with_columns( pl.lit( test['new_rules'] ).alias('LudRules') )\n",
+    "    test = test.drop(['new_rules'])\n",
+    "\n",
+    "    \n",
+    "    model_structure, agent_fields, agent_fields_to_init_dict, TARGET, FEATURES, group_FEATURES_cols = FEATURES_etc_by_set[0]\n",
+    "\n",
+    "    \n",
+    "    for FEATURE in group_FEATURES_cols:\n",
+    "        test = test.with_columns( pl.lit(False).alias(FEATURE) )\n",
+    "\n",
+    "    \n",
+    "    \n",
+    "    test_ext = copy.deepcopy(test)\n",
+    "\n",
+    "    test = test.with_columns( pl.lit(0).alias('is_ext_flipped') )\n",
+    "    test_ext = test_ext.with_columns( pl.lit(1).alias('is_ext_flipped') )\n",
+    "\n",
+    "\n",
+    "    test_ext = test_ext.with_columns( pl.lit(test['agent2']).alias('agent1') )\n",
+    "    test_ext = test_ext.with_columns( pl.lit(test['agent1']).alias('agent2') )\n",
+    "\n",
+    "\n",
+    "    #flip with 1-value\n",
+    "    test_ext = test_ext.with_columns( pl.lit(1-test['AdvantageP1']).alias('AdvantageP1') )\n",
+    "    \n",
+    "\n",
+    "    full_test_df = pl.concat([test, test_ext])\n",
+    "    full_test_df = process_agent_fields(full_test_df)\n",
+    "\n",
+    "    len_test = len(test)\n",
+    "\n",
+    "    \n",
+    "    n_threads = 2\n",
+    "\n",
+    "    \n",
+    "    #NEURAL prep\n",
+    "    test_neural = full_test_df\n",
+    "    NRL_FEATURES_NORMALIZED = []\n",
+    "    for FEATURE in NRL_FEATURES:\n",
+    "        FEATURE_SHRT = FEATURE[4:]\n",
+    "        if FEATURE in NRL_BOOL_FEATURES:\n",
+    "            NRL_FEATURES_NORMALIZED.append(FEATURE_SHRT)\n",
+    "        else:\n",
+    "            NRL_FEATURES_NORMALIZED.append(FEATURE+'_NORMALIZED')\n",
+    "            #per feature\n",
+    "            normalized_feature = np.interp(test_neural[FEATURE_SHRT], ppf_tuples_COMPRESSED[FEATURE], norm_ppf_tuple_COMPRESSED)\n",
+    "            test_neural = test_neural.with_columns( pl.lit(normalized_feature).alias(FEATURE+'_NORMALIZED') )\n",
+    "\n",
+    "    pred_data = np.array(test_neural[NRL_FEATURES_NORMALIZED]).astype('float32')    \n",
+    "    \n",
+    "\n",
+    "    full_preds_overall = []\n",
+    "    full_preds_overall_PubliLeaderboardFitted = []\n",
+    "    \n",
+    "    equal_w_preds_split_by_set = []\n",
+    "    equal_w_preds_overall_by_set = []\n",
+    "    equal_w_preds_reversed_split_by_set = []\n",
+    "    equal_w_preds_reversed_overall_by_set = []\n",
+    "\n",
+    "\n",
+    "    \n",
+    "    \n",
+    "    #predictions from BOOSTING models\n",
+    "    \n",
+    "    #catboost overall, unchanged model for all sets - only predict from first:\n",
+    "    catboost_overall_pre_preds_essential = models_by_set[0]['catboost_essential']['overall'].predict(np.array(full_test_df[FEATURES+group_FEATURES_cols]), thread_count=n_threads)\n",
+    "    catboost_overall_pre_preds = models_by_set[0]['catboost']['overall'].predict(np.array(full_test_df[FEATURES]), thread_count=n_threads)\n",
+    "    \n",
+    "    for set_nr in model_sets_to_use:\n",
+    "        equal_w_preds_split_by_set.append([])\n",
+    "        equal_w_preds_overall_by_set.append([])\n",
+    "        equal_w_preds_reversed_split_by_set.append([])\n",
+    "        equal_w_preds_reversed_overall_by_set.append([])\n",
+    "        \n",
+    "        preds_just_original = np.zeros(len_test)\n",
+    "        preds = np.zeros(len_test)\n",
+    "        preds_reversed_agents = np.zeros(len_test)\n",
+    "        \n",
+    "        model_structure, agent_fields, agent_fields_to_init_dict, TARGET, FEATURES, group_FEATURES_cols = FEATURES_etc_by_set[set_nr]\n",
+    "    \n",
+    "        for essential_add in ['', '_essential']:\n",
+    "            if essential_add=='_essential':\n",
+    "                pred_features = np.array(full_test_df[FEATURES+group_FEATURES_cols])\n",
+    "            else:\n",
+    "                pred_features = np.array(full_test_df[FEATURES])\n",
+    "    \n",
+    "            if essential_add=='_essential':\n",
+    "                model_w_prop = model_structure['weighting_props']['essential']\n",
+    "            else:\n",
+    "                model_w_prop = (1-model_structure['weighting_props']['essential'])\n",
+    "    \n",
+    "            for model_name in model_structure['weighting_props']['model_types']:\n",
+    "                model_w = model_structure['weighting_props']['model_types'][model_name]*model_w_prop\n",
+    "    \n",
+    "                model_structure_name = model_name+essential_add\n",
+    "    \n",
+    "                for cv_split_or_overall_switch in ['cv_splits', 'overall']:\n",
+    "                    if cv_split_or_overall_switch == 'cv_splits':\n",
+    "                        model_w_preds = model_w*(1-model_structure['weighting_props']['overall_models'])/nr_of_cv_splits\n",
+    "    \n",
+    "                        for split_model_nr in range(nr_of_cv_splits):\n",
+    "                            if model_name == 'lgbm':\n",
+    "                                pre_preds = models_by_set[set_nr][model_structure_name][cv_split_or_overall_switch][split_model_nr].predict(pred_features)\n",
+    "                            elif model_name == 'catboost':\n",
+    "                                pre_preds = models_by_set[set_nr][model_structure_name][cv_split_or_overall_switch][split_model_nr].predict(pred_features, thread_count=n_threads)\n",
+    "    \n",
+    "                            pre_preds = cap_to_target_range( pre_preds )\n",
+    "    \n",
+    "                            preds += pre_preds[:len_test] * model_w_preds\n",
+    "                            preds_reversed_agents += pre_preds[len_test:] * model_w_preds\n",
+    "\n",
+    "                            if split_model_nr==0:\n",
+    "                                equal_w_preds_split_by_set[-1].append(pre_preds[:len_test]/nr_of_cv_splits)\n",
+    "                                equal_w_preds_reversed_split_by_set[-1].append(pre_preds[len_test:]*-1/nr_of_cv_splits)\n",
+    "                            else:\n",
+    "                                equal_w_preds_split_by_set[-1][-1] += pre_preds[:len_test]/nr_of_cv_splits\n",
+    "                                equal_w_preds_reversed_split_by_set[-1][-1] += pre_preds[len_test:]*-1/nr_of_cv_splits\n",
+    "    \n",
+    "                    else: #i.e. overall model\n",
+    "                        model_w_preds = model_w*model_structure['weighting_props']['overall_models']\n",
+    "    \n",
+    "                        if model_name == 'lgbm':\n",
+    "                            pre_preds = models_by_set[set_nr][model_structure_name][cv_split_or_overall_switch].predict(pred_features)\n",
+    "                        elif model_name == 'catboost':\n",
+    "                            if essential_add=='_essential':\n",
+    "                                pre_preds = catboost_overall_pre_preds_essential\n",
+    "                            else:\n",
+    "                                pre_preds = catboost_overall_pre_preds\n",
+    "    \n",
+    "                        pre_preds = cap_to_target_range( pre_preds )\n",
+    "    \n",
+    "                        preds += pre_preds[:len_test] * model_w_preds\n",
+    "                        preds_reversed_agents += pre_preds[len_test:] * model_w_preds\n",
+    "\n",
+    "                        equal_w_preds_overall_by_set[-1].append(pre_preds[:len_test])\n",
+    "                        equal_w_preds_reversed_overall_by_set[-1].append(pre_preds[len_test:]*-1)\n",
+    "    \n",
+    "        \n",
+    "        pred_arrays = {}\n",
+    "        pred_arrays['tmp_ens_preds'] = preds\n",
+    "        pred_arrays['tmp_ens_preds_reversed_agents'] = preds_reversed_agents\n",
+    "        pred_arrays['AdvantageP1'] = np.array(test['AdvantageP1'])\n",
+    "\n",
+    "\n",
+    "        \n",
+    "        #predictions from NEURAL models\n",
+    "        with tf.device(f'/GPU:{gpu_by_set[set_nr]}'):\n",
+    "            tmp_preds_NN = neural_models[set_nr](tf.convert_to_tensor(pred_data))['output_0'].numpy().T\n",
+    "\n",
+    "        \n",
+    "        capped_preds = cap_to_target_range( tmp_preds_NN[0] )\n",
+    "        tmp_preds = capped_preds * model_structure['weighting_props']['overall_models']\n",
+    "        pred_arrays['preds_NEURAL'] = tmp_preds[:len_test]\n",
+    "        pred_arrays['preds_reversed_agents_NEURAL'] = tmp_preds[len_test:]\n",
+    "        equal_w_preds_split_by_set[-1].append(capped_preds[:len_test])\n",
+    "        equal_w_preds_reversed_split_by_set[-1].append(capped_preds[len_test:]*-1)\n",
+    "        \n",
+    "        capped_preds = cap_to_target_range( tmp_preds_NN[3] )\n",
+    "        tmp_preds = capped_preds * (1-model_structure['weighting_props']['overall_models'])\n",
+    "        pred_arrays['preds_NEURAL'] += tmp_preds[:len_test]\n",
+    "        pred_arrays['preds_reversed_agents_NEURAL'] += tmp_preds[len_test:]\n",
+    "        equal_w_preds_overall_by_set[-1].append(capped_preds[:len_test])\n",
+    "        equal_w_preds_reversed_overall_by_set[-1].append(capped_preds[len_test:]*-1)\n",
+    "\n",
+    "        \n",
+    "        capped_preds = cap_to_target_range( tmp_preds_NN[1] )\n",
+    "        tmp_preds = capped_preds * model_structure['weighting_props']['overall_models']\n",
+    "        pred_arrays['preds_NEURAL_AE'] = tmp_preds[:len_test]\n",
+    "        pred_arrays['preds_reversed_agents_NEURAL_AE'] = tmp_preds[len_test:]\n",
+    "        equal_w_preds_split_by_set[-1].append(capped_preds[:len_test])\n",
+    "        equal_w_preds_reversed_split_by_set[-1].append(capped_preds[len_test:]*-1)\n",
+    "        \n",
+    "        capped_preds = cap_to_target_range( tmp_preds_NN[4] )\n",
+    "        tmp_preds = capped_preds * (1-model_structure['weighting_props']['overall_models'])\n",
+    "        pred_arrays['preds_NEURAL_AE'] += tmp_preds[:len_test]\n",
+    "        pred_arrays['preds_reversed_agents_NEURAL_AE'] += tmp_preds[len_test:]\n",
+    "        equal_w_preds_overall_by_set[-1].append(capped_preds[:len_test])\n",
+    "        equal_w_preds_reversed_overall_by_set[-1].append(capped_preds[len_test:]*-1)\n",
+    "\n",
+    "\n",
+    "        capped_preds = cap_to_target_range( tmp_preds_NN[2] )\n",
+    "        tmp_preds = capped_preds * model_structure['weighting_props']['overall_models']\n",
+    "        pred_arrays['preds_NEURAL_BIG'] = tmp_preds[:len_test]\n",
+    "        pred_arrays['preds_reversed_agents_NEURAL_BIG'] = tmp_preds[len_test:]\n",
+    "        equal_w_preds_split_by_set[-1].append(capped_preds[:len_test])\n",
+    "        equal_w_preds_reversed_split_by_set[-1].append(capped_preds[len_test:]*-1)\n",
+    "        \n",
+    "        capped_preds = cap_to_target_range( tmp_preds_NN[5] )\n",
+    "        tmp_preds = capped_preds * (1-model_structure['weighting_props']['overall_models'])\n",
+    "        pred_arrays['preds_NEURAL_BIG'] += tmp_preds[:len_test]\n",
+    "        pred_arrays['preds_reversed_agents_NEURAL_BIG'] += tmp_preds[len_test:]\n",
+    "        equal_w_preds_overall_by_set[-1].append(capped_preds[:len_test])\n",
+    "        equal_w_preds_reversed_overall_by_set[-1].append(capped_preds[len_test:]*-1)\n",
+    "        \n",
+    "\n",
+    "        #w/o full set of reversed agents\n",
+    "        reg_params = model_structure['reg_params_neural']\n",
+    "    \n",
+    "        preds_final = np.zeros(len_test)\n",
+    "        for param in reg_params.keys():\n",
+    "            if param=='Intercept':\n",
+    "                preds_final += reg_params[param]\n",
+    "            else:\n",
+    "                preds_final += reg_params[param] * pred_arrays[param]\n",
+    "    \n",
+    "        preds_final = cap_to_target_range( preds_final )\n",
+    "        \n",
+    "        reg_params = model_structure['reg_params_final_stretch']\n",
+    "        preds_final_stretched = np.zeros(len_test)\n",
+    "        for param in reg_params.keys():\n",
+    "            if param=='Intercept':\n",
+    "                preds_final_stretched += reg_params[param]\n",
+    "            else:\n",
+    "                preds_final_stretched += reg_params[param] * preds_final\n",
+    "\n",
+    "        preds_final_stretched = cap_to_target_range( preds_final_stretched )\n",
+    "        \n",
+    "        \n",
+    "        #with full set of reversed agents\n",
+    "        reg_params = model_structure['reg_params_neural_FULL']\n",
+    "    \n",
+    "        preds_final = np.zeros(len_test)\n",
+    "        for param in reg_params.keys():\n",
+    "            if param=='Intercept':\n",
+    "                preds_final += reg_params[param]\n",
+    "            else:\n",
+    "                preds_final += reg_params[param] * pred_arrays[param]\n",
+    "    \n",
+    "        preds_final = cap_to_target_range( preds_final )\n",
+    "        \n",
+    "        reg_params = model_structure['reg_params_final_stretch_FULL']\n",
+    "        preds_final_stretched_FULL = np.zeros(len_test)\n",
+    "        for param in reg_params.keys():\n",
+    "            if param=='Intercept':\n",
+    "                preds_final_stretched_FULL += reg_params[param]\n",
+    "            else:\n",
+    "                preds_final_stretched_FULL += reg_params[param] * preds_final\n",
+    "        \n",
+    "        preds_final_stretched_FULL = cap_to_target_range( preds_final_stretched_FULL )\n",
+    "\n",
+    "        \n",
+    "        \n",
+    "        full_preds_overall.append( preds_final_stretched )\n",
+    "        \n",
+    "        full_set_of_reversed_agents_prop = -3.5 #(value fitted through public leaderboard)\n",
+    "        full_preds_overall_PubliLeaderboardFitted.append( (1-full_set_of_reversed_agents_prop)*preds_final_stretched + full_set_of_reversed_agents_prop*preds_final_stretched_FULL )\n",
+    "\n",
+    "\n",
+    "    #combine preds from all sets\n",
+    "    median_prop = .75\n",
+    "    full_preds_overall = (1-median_prop) * np.mean(full_preds_overall, axis=0) + median_prop * np.median(full_preds_overall, axis=0)\n",
+    "    full_preds_overall_PubliLeaderboardFitted = (1-median_prop) * np.mean(full_preds_overall_PubliLeaderboardFitted, axis=0) + median_prop * np.median(full_preds_overall_PubliLeaderboardFitted, axis=0)\n",
+    "\n",
+    "    \n",
+    "    #equal model weights preds\n",
+    "    concatenated_eq_preds = np.concatenate( (equal_w_preds_split_by_set, equal_w_preds_overall_by_set, equal_w_preds_reversed_split_by_set, equal_w_preds_reversed_overall_by_set), axis=1)\n",
+    "    concatenated_eq_preds = np.concatenate( concatenated_eq_preds, axis=0)\n",
+    "    median_prop = .75\n",
+    "    full_preds_overall_equal_w = (1-median_prop) * np.mean( concatenated_eq_preds, axis=0) + median_prop * np.median( concatenated_eq_preds, axis=0)\n",
+    "    equal_w_prop = -.6 #(value fitted through public leaderboard)\n",
+    "    full_preds_overall_PubliLeaderboardFitted = (1-equal_w_prop)*full_preds_overall_PubliLeaderboardFitted + equal_w_prop*full_preds_overall_equal_w\n",
+    "\n",
+    "    \n",
+    "    #final blend of CV and PL optimized preds\n",
+    "    full_preds_overall_final = original_CV_optimized_prop * full_preds_overall + (1-original_CV_optimized_prop) * full_preds_overall_PubliLeaderboardFitted\n",
+    "\n",
+    "    return sample_sub.with_columns(pl.Series('utility_agent1', cap_to_target_range(full_preds_overall_final) ))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "c265a0e9",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006976,
+     "end_time": "2024-12-30T02:36:36.000926",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:35.993950",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "47b612a5",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006768,
+     "end_time": "2024-12-30T02:36:36.014676",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:36.007908",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "id": "abd04286",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:36.030784Z",
+     "iopub.status.busy": "2024-12-30T02:36:36.029896Z",
+     "iopub.status.idle": "2024-12-30T02:36:36.124516Z",
+     "shell.execute_reply": "2024-12-30T02:36:36.123720Z"
+    },
+    "papermill": {
+     "duration": 0.104775,
+     "end_time": "2024-12-30T02:36:36.126708",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:36.021933",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "with open(data_paths[0] + 'neural_objects.pkl', \"rb\") as f:\n",
+    "    NRL_BOOL_FEATURES, NRL_FEATURES, NRL_FEATURES_NORMALIZED, norm_ppf_tuple_COMPRESSED, ppf_tuples_COMPRESSED = pickle.load(f)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "id": "a9a30f34",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:36.143003Z",
+     "iopub.status.busy": "2024-12-30T02:36:36.142050Z",
+     "iopub.status.idle": "2024-12-30T02:36:36.150211Z",
+     "shell.execute_reply": "2024-12-30T02:36:36.149263Z"
+    },
+    "papermill": {
+     "duration": 0.018236,
+     "end_time": "2024-12-30T02:36:36.152206",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:36.133970",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "with open(data_paths[0] + 'model_structure_etc.pkl', \"rb\") as f:\n",
+    "    model_structure, agent_fields, agent_fields_to_init_dict, TARGET, FEATURES, group_FEATURES_cols = pickle.load(f)   \n",
+    "    "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "id": "b9cfa44c",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:36.167983Z",
+     "iopub.status.busy": "2024-12-30T02:36:36.167382Z",
+     "iopub.status.idle": "2024-12-30T02:36:36.206628Z",
+     "shell.execute_reply": "2024-12-30T02:36:36.205811Z"
+    },
+    "papermill": {
+     "duration": 0.049482,
+     "end_time": "2024-12-30T02:36:36.208959",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:36.159477",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "FEATURES_etc_by_set = {}\n",
+    "for set_nr in [0] + model_sets_to_use:\n",
+    "    with open(data_paths[set_nr] + 'model_structure_etc.pkl', \"rb\") as f:\n",
+    "        FEATURES_etc_by_set[set_nr] = pickle.load(f)   \n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cf78ffc7",
+   "metadata": {
+    "papermill": {
+     "duration": 0.00705,
+     "end_time": "2024-12-30T02:36:36.223499",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:36.216449",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "bdbb96b4",
+   "metadata": {
+    "papermill": {
+     "duration": 0.007083,
+     "end_time": "2024-12-30T02:36:36.237882",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:36.230799",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 24,
+   "id": "da5d9c42",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:36.253721Z",
+     "iopub.status.busy": "2024-12-30T02:36:36.253352Z",
+     "iopub.status.idle": "2024-12-30T02:36:36.257644Z",
+     "shell.execute_reply": "2024-12-30T02:36:36.256799Z"
+    },
+    "papermill": {
+     "duration": 0.014355,
+     "end_time": "2024-12-30T02:36:36.259514",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:36.245159",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "loaded_neural_models = {}\n",
+    "neural_models = {}"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4e4ed477",
+   "metadata": {
+    "papermill": {
+     "duration": 0.006639,
+     "end_time": "2024-12-30T02:36:36.273166",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:36.266527",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 25,
+   "id": "aba52573",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:36.288963Z",
+     "iopub.status.busy": "2024-12-30T02:36:36.288078Z",
+     "iopub.status.idle": "2024-12-30T02:36:36.292413Z",
+     "shell.execute_reply": "2024-12-30T02:36:36.291487Z"
+    },
+    "papermill": {
+     "duration": 0.014186,
+     "end_time": "2024-12-30T02:36:36.294403",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:36.280217",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": [
+    "nr_of_cv_splits = 5"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 26,
+   "id": "e76de7bb",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:36:36.310531Z",
+     "iopub.status.busy": "2024-12-30T02:36:36.310047Z",
+     "iopub.status.idle": "2024-12-30T02:37:09.540957Z",
+     "shell.execute_reply": "2024-12-30T02:37:09.539795Z"
+    },
+    "papermill": {
+     "duration": 33.24121,
+     "end_time": "2024-12-30T02:37:09.542884",
+     "exception": false,
+     "start_time": "2024-12-30T02:36:36.301674",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "caboost best_iteration split 0: 498\n",
+      "caboost best_iteration split 1: 499\n",
+      "caboost best_iteration split 2: 492\n",
+      "caboost best_iteration split 3: 497\n",
+      "caboost best_iteration split 4: 496\n",
+      "caboost \"best_iteration\" overall: 498\n",
+      "caboost best_iteration split 0: 499\n",
+      "caboost best_iteration split 1: 499\n",
+      "caboost best_iteration split 2: 498\n",
+      "caboost best_iteration split 3: 498\n",
+      "caboost best_iteration split 4: 499\n",
+      "caboost \"best_iteration\" overall: 500\n",
+      "caboost best_iteration split 0: 478\n",
+      "caboost best_iteration split 1: 497\n",
+      "caboost best_iteration split 2: 490\n",
+      "caboost best_iteration split 3: 499\n",
+      "caboost best_iteration split 4: 497\n",
+      "caboost best_iteration split 0: 495\n",
+      "caboost best_iteration split 1: 498\n",
+      "caboost best_iteration split 2: 488\n",
+      "caboost best_iteration split 3: 499\n",
+      "caboost best_iteration split 4: 495\n",
+      "caboost best_iteration split 0: 484\n",
+      "caboost best_iteration split 1: 495\n",
+      "caboost best_iteration split 2: 493\n",
+      "caboost best_iteration split 3: 461\n",
+      "caboost best_iteration split 4: 499\n",
+      "caboost best_iteration split 0: 496\n",
+      "caboost best_iteration split 1: 499\n",
+      "caboost best_iteration split 2: 497\n",
+      "caboost best_iteration split 3: 492\n",
+      "caboost best_iteration split 4: 498\n",
+      "caboost best_iteration split 0: 499\n",
+      "caboost best_iteration split 1: 497\n",
+      "caboost best_iteration split 2: 499\n",
+      "caboost best_iteration split 3: 499\n",
+      "caboost best_iteration split 4: 499\n",
+      "caboost best_iteration split 0: 496\n",
+      "caboost best_iteration split 1: 499\n",
+      "caboost best_iteration split 2: 499\n",
+      "caboost best_iteration split 3: 499\n",
+      "caboost best_iteration split 4: 499\n",
+      "caboost best_iteration split 0: 499\n",
+      "caboost best_iteration split 1: 498\n",
+      "caboost best_iteration split 2: 499\n",
+      "caboost best_iteration split 3: 498\n",
+      "caboost best_iteration split 4: 495\n",
+      "caboost best_iteration split 0: 494\n",
+      "caboost best_iteration split 1: 497\n",
+      "caboost best_iteration split 2: 499\n",
+      "caboost best_iteration split 3: 499\n",
+      "caboost best_iteration split 4: 499\n",
+      "caboost best_iteration split 0: 480\n",
+      "caboost best_iteration split 1: 499\n",
+      "caboost best_iteration split 2: 499\n",
+      "caboost best_iteration split 3: 492\n",
+      "caboost best_iteration split 4: 497\n",
+      "caboost best_iteration split 0: 498\n",
+      "caboost best_iteration split 1: 499\n",
+      "caboost best_iteration split 2: 499\n",
+      "caboost best_iteration split 3: 484\n",
+      "caboost best_iteration split 4: 499\n"
+     ]
+    }
+   ],
+   "source": [
+    "#load catboost and lgbm models\n",
+    "\n",
+    "use_lgbm_early_stop = True\n",
+    "if use_lgbm_early_stop:\n",
+    "    early_stop_str_add = '_early_stop'\n",
+    "else:\n",
+    "    early_stop_str_add = ''\n",
+    "    \n",
+    "use_catboost_early_stop = True\n",
+    "    \n",
+    "\n",
+    "models_by_set = {}\n",
+    "for set_nr in model_sets_to_use:\n",
+    "    models_by_set[set_nr] = {}\n",
+    "    for essential_add in ['', '_essential']:\n",
+    "        for model_name in model_structure['weighting_props']['model_types']:\n",
+    "            model_structure_name = model_name+essential_add\n",
+    "            models_by_set[set_nr][model_structure_name] = {}\n",
+    "            for cv_split_or_overall_switch in ['cv_splits', 'overall']:\n",
+    "                if cv_split_or_overall_switch=='cv_splits':\n",
+    "                    cat_cv_splits_best_iterations = []\n",
+    "                    models_by_set[set_nr][model_structure_name][cv_split_or_overall_switch] = []\n",
+    "                    for split_model_nr in range(nr_of_cv_splits):\n",
+    "                        if model_name == 'lgbm':\n",
+    "                            tmp_model = lgb.Booster(model_file=data_paths[set_nr] +f'{model_name}{essential_add}_sub_{split_model_nr}{early_stop_str_add}.txt')\n",
+    "                        elif model_name == 'catboost':\n",
+    "                            tmp_model = CatBoostRegressor()\n",
+    "                            tmp_model.load_model(data_paths[set_nr] + f'{model_name}{essential_add}_sub_{split_model_nr}.cbm')\n",
+    "                            if use_catboost_early_stop:\n",
+    "                                best_iteration = tmp_model.get_best_iteration()\n",
+    "                                print(f'caboost best_iteration split {split_model_nr}: {best_iteration}')\n",
+    "                                cat_cv_splits_best_iterations.append(best_iteration)\n",
+    "                                tmp_model.shrink(ntree_end=best_iteration)\n",
+    "                        models_by_set[set_nr][model_structure_name][cv_split_or_overall_switch].append( tmp_model )\n",
+    "                else: #i.e. overall model\n",
+    "                    if model_name == 'lgbm':\n",
+    "                        tmp_model = lgb.Booster(model_file=data_paths[set_nr]+f'{model_name}{essential_add}.txt')\n",
+    "                        models_by_set[set_nr][model_structure_name][cv_split_or_overall_switch] = tmp_model\n",
+    "                        \n",
+    "                    elif model_name == 'catboost' and (set_nr==0 or 0 not in model_sets_to_use):\n",
+    "                        tmp_model = CatBoostRegressor()\n",
+    "                        tmp_model.load_model(data_paths[0] + f'{model_name}{essential_add}.cbm')\n",
+    "                        if use_catboost_early_stop:\n",
+    "                            best_iteration = 1 + round(.5*np.mean(np.asarray(cat_cv_splits_best_iterations)**.5)**2 + .5*np.median(cat_cv_splits_best_iterations))\n",
+    "                            print(f'caboost \"best_iteration\" overall: {best_iteration}')\n",
+    "                            tmp_model.shrink(ntree_end=best_iteration)\n",
+    "                        if 0 not in models_by_set:\n",
+    "                            models_by_set[0] = {}\n",
+    "                        if model_structure_name not in models_by_set[0]:\n",
+    "                            models_by_set[0][model_structure_name] = {}\n",
+    "                        models_by_set[0][model_structure_name][cv_split_or_overall_switch] = tmp_model\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "d87c9bd9",
+   "metadata": {
+    "papermill": {
+     "duration": 0.008072,
+     "end_time": "2024-12-30T02:37:09.559279",
+     "exception": false,
+     "start_time": "2024-12-30T02:37:09.551207",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "id": "45e60617",
+   "metadata": {
+    "execution": {
+     "iopub.execute_input": "2024-12-30T02:37:09.577027Z",
+     "iopub.status.busy": "2024-12-30T02:37:09.576406Z",
+     "iopub.status.idle": "2024-12-30T02:38:56.158180Z",
+     "shell.execute_reply": "2024-12-30T02:38:56.157253Z"
+    },
+    "papermill": {
+     "duration": 106.593311,
+     "end_time": "2024-12-30T02:38:56.160613",
+     "exception": false,
+     "start_time": "2024-12-30T02:37:09.567302",
+     "status": "completed"
+    },
+    "tags": []
+   },
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "TBB Warning: The number of workers is currently limited to 0. The request for 1 workers is ignored. Further requests for more workers will be silently ignored until the limit changes.\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "inference_server = kaggle_evaluation.mcts_inference_server.MCTSInferenceServer(predict)\n",
+    "\n",
+    "if os.getenv('KAGGLE_IS_COMPETITION_RERUN'):\n",
+    "    inference_server.serve()\n",
+    "else:\n",
+    "    inference_server.run_local_gateway(\n",
+    "        (\n",
+    "            '/kaggle/input/um-game-playing-strength-of-mcts-variants/test.csv',\n",
+    "            '/kaggle/input/um-game-playing-strength-of-mcts-variants/sample_submission.csv'\n",
+    "        )\n",
+    "    )"
+   ]
+  }
+ ],
+ "metadata": {
+  "kaggle": {
+   "accelerator": "none",
+   "dataSources": [
+    {
+     "databundleVersionId": 9515283,
+     "sourceId": 70089,
+     "sourceType": "competition"
+    },
+    {
+     "datasetId": 6263190,
+     "sourceId": 10146472,
+     "sourceType": "datasetVersion"
+    }
+   ],
+   "dockerImageVersionId": 30762,
+   "isGpuEnabled": false,
+   "isInternetEnabled": false,
+   "language": "python",
+   "sourceType": "notebook"
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.14"
+  },
+  "papermill": {
+   "default_parameters": {},
+   "duration": 163.824791,
+   "end_time": "2024-12-30T02:39:01.009490",
+   "environment_variables": {},
+   "exception": null,
+   "input_path": "__notebook__.ipynb",
+   "output_path": "__notebook__.ipynb",
+   "parameters": {},
+   "start_time": "2024-12-30T02:36:17.184699",
+   "version": "2.6.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

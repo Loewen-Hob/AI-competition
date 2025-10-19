@@ -20,14 +20,13 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 import numpy as np
 import copy
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"  # 只让 GPU 0 对程序可见
+
 # 识别设备
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Using device: {device}")
 
 # %% 2. 定义常量和数据目录
-DATA_DIR = Path('/ssd2/zhanghongbo04/data')
+DATA_DIR = Path('/ssd1/zhanghongbo04/002/project/AI-competition/202510EEG_Foundation_Challenge/startkit/data')
 # DATA_DIR.mkdir(parents=True, exist_ok=True) # 假设目录已存在
 
 SFREQ = 100
@@ -65,9 +64,9 @@ for task in source_tasks:
     try:
         dataset = EEGChallengeDataset(
             task=task,
-            release="R1",
+            release="R5",
             cache_dir=DATA_DIR,
-            mini=True  # !! 设置为 False 来获取完整数据集
+            mini=False  # !! 设置为 False 来获取完整数据集
         )
         all_source_datasets.append(dataset)
         print(f"Loaded {task} (mini=False) with {len(dataset.datasets)} recordings.")
@@ -160,11 +159,14 @@ class NTXentLoss(nn.Module):
         """
         B = z.shape[0] // 2
         
-        # (动态检查 batch size 的代码可以保留)
+        # 动态检查 batch size，以防最后一个 batch 较小 (尽管我们用了 drop_last)
         if B != self.batch_size:
             print(f"Warning: Batch size mismatch. Expected {self.batch_size}, got {B}")
-            # 注意: 我们不再需要 current_mask
-        
+            # 动态创建掩码
+            current_mask = (~torch.eye(B * 2, B * 2, dtype=torch.bool)).float().to(self.device)
+        else:
+            current_mask = self.mask
+
         # 归一化投影
         z_norm = F.normalize(z, dim=1)
         
@@ -172,20 +174,17 @@ class NTXentLoss(nn.Module):
         sim_matrix = (z_norm @ z_norm.T) / self.temperature
         
         # 创建标签 (正样本对)
+        # z_i 和 z_j 是正样本对
         # z_i 在 [0..B-1], z_j 在 [B..2B-1]
         labels = torch.cat([
             torch.arange(B, 2 * B),
             torch.arange(B)
         ]).to(self.device)
         
-        # 修正: Logits 就是完整的相似度矩阵
-        # 它的形状是 [2*B, 2*B]
-        logits = sim_matrix 
+        # (2B, 2B) -> (2B, 2B-1)
+        logits = sim_matrix[current_mask.bool()].view(2 * B, -1)
         
         # 计算 CrossEntropyLoss
-        # logits 形状 [N, C] = [2B, 2B]
-        # labels 形状 [N] = [2B], 值的范围是 [0, 2B-1]
-        # 这是完全正确的，断言 t < C (即 2B-1 < 2B) 会通过
         loss = F.cross_entropy(logits, labels)
         return loss
 
@@ -196,22 +195,16 @@ class PretrainEEGConformer(nn.Module):
         # 1. 加载骨干网络
         self.backbone = EEGConformer(
             n_chans=n_chans,
-            n_outputs=1, # 随便设置一个
+            n_outputs=1, # 随便设置一个，我们马上会替换掉它
             n_times=n_times,
             sfreq=sfreq,
-            final_fc_length="auto" # 确保 'auto' 被设置
         )
         
-        # 2. 获取骨干的输出维度 (S_tokens * D_model)
-        embedding_size = self.backbone.final_fc_length
+        # 2. 获取骨干的输出维度
+        embedding_size = self.backbone.fc.in_features
         
-        # 3. 替换掉骨干的*整个*分类头
-        #    原始的 self.fc 负责 (Flatten -> Linear -> ... -> Linear)
-        #    我们将其替换为 nn.Flatten()，使其输出我们想要的 [B, embedding_size]
-        self.backbone.fc = nn.Flatten(start_dim=1) 
-        
-        #    我们还必须替换掉 self.final_layer，否则它会出错
-        self.backbone.final_layer = nn.Identity() # <--- 关键修复
+        # 3. 替换掉骨干的最后一层 (fc)
+        self.backbone.fc = nn.Identity()
         
         # 4. 创建新的投影头 (Projector)
         self.projector = nn.Sequential(
@@ -222,16 +215,10 @@ class PretrainEEGConformer(nn.Module):
         
     def forward(self, x):
         # x: [2*B, C, T]
-        
-        # self.backbone(x) 现在将执行:
-        # 1. patch_embedding -> transformer (输出 [2*B, S_tokens, D_model])
-        # 2. self.fc (nn.Flatten)  (输出 [2*B, S_tokens * D_model])
-        # 3. self.final_layer (nn.Identity) (输出 [2*B, S_tokens * D_model])
         features = self.backbone(x)  # [2*B, embedding_size]
-        
-        # features 现在具有投影头所需的正确 2D 形状
         projections = self.projector(features) # [2*B, projection_dim]
         return projections
+
 # %% 9. 初始化模型、损失和优化器
 # 从窗口数据中自动获取 n_chans 和 n_times
 n_chans = pretrain_windows[0][0].shape[0]
